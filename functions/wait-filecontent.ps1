@@ -25,6 +25,7 @@ function Wait-FileContent
             $path = "$env:windir\ccm\logs\PolicyAgent.log"
             $RegExPatterns = @{
                 'instance of CCM_PolicyAgent_AssignmentsRequested' = 'Completed'
+                'Evaluation not required' = 'Not required'
             }
             $script = [scriptblock]::Create('$null = Invoke-WmiMethod -Namespace root\CCM -Class SMS_Client -Name TriggerSchedule "{00000000-0000-0000-0000-000000000021}"')
 
