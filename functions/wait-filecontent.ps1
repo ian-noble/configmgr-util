@@ -84,110 +84,104 @@ function Wait-FileContent
         {
             continue 
         }
-        else
+
+        if ($LastFileCreateTime)
         {
-            if ($LastFileCreateTime)
+            $CurrentFileCreateTime = (Get-Item $Path).CreationTime 
+            if ($CurrentFileCreateTime -ne $LastFileCreateTime)
             {
-                $CurrentFileCreateTime = (Get-Item $Path).CreationTime 
-                if ($CurrentFileCreateTime -ne $LastFileCreateTime)
-                {
-                    $FileJustRotated = $true
-                    write-verbose -message "File creation time changed. Will scan entire file."
-                }
-            }
-
-            # Has the file changed since the last pass?
-            $Reader = New-Object -TypeName System.IO.StreamReader -ArgumentList (New-Object -TypeName IO.FileStream -ArgumentList ($Path, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, ([IO.FileShare]::Delete, ([IO.FileShare]::ReadWrite))))
-            $FileLength = $Reader.BaseStream.Length
-            $Reader.Close()
-            if (($FileLength -eq $LastFilePos) -and $FileJustRotated -eq $false)
-            {
-                continue
-            }
-            else
-            { 
-
-                if ($FileLength -lt $LastFilePos)
-                {
-                    $FileJustRotated = $true
-                    write-verbose -message "File content reduced in size, file may have been rotated. Will scan entire file."
-                }              
-                
-                $RotatedFileMatch = $Path -replace '\.', '-*.' 
-                $RotatedPath = Get-ChildItem -Path $RotatedFileMatch -ErrorAction SilentlyContinue | Where-Object { $_.LastWriteTime -gt $RotateTime }
-                
-                if ($RotatedPath) 
-                {
-                    Write-Verbose -Message "Rotated file detected: $RotatedPath, scanning it from position $LastFilePos"
-                    
-                    $RotatedReader = New-Object -TypeName System.IO.StreamReader -ArgumentList (New-Object -TypeName IO.FileStream -ArgumentList ($RotatedPath.FullName, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, ([IO.FileShare]::Delete, ([IO.FileShare]::ReadWrite))))
-                    $null = $RotatedReader.BaseStream.Seek($LastFilePos, [System.IO.SeekOrigin]::Begin)
-                
-                    while (($Line = $RotatedReader.ReadLine()) -ne $null)
-                    {
-                        if (-not (test-path -LiteralPath $Path -ErrorAction SilentlyContinue))
-                        {
-                            $RotatedReader.Close()
-                            write-verbose -message "File renamed, moved or deleted, may have been rotated."
-                            continue
-                        }
-                        else
-                        {
-                            Write-Verbose -Message $Line
-                            foreach ($RegExPattern in $RegExPatterns.Keys)
-                            {
-                                if ($Line -match $RegExPattern)
-                                {
-                                    $RegExPatterns[$RegExPattern]
-                                    $RotatedReader.Close()
-                                    break Loop
-                                }
-                            }
-                        }
-                    }
-                    $RotatedReader.Close()
-                    $RotateTime = $RotatedPath.LastWriteTime
-        
-                    write-verbose -message "Setting scan position to 0 as file was rotated."
-                    $LastFilePos = 0
-                }
-        
-                if ($FileJustRotated)
-                {
-                    write-verbose -message "Setting scan position to 0 as file rotated."
-                    $LastFilePos = 0
-                    $FileJustRotated = $false
-                }
-                    
-                $Reader = New-Object -TypeName System.IO.StreamReader -ArgumentList (New-Object -TypeName IO.FileStream -ArgumentList ($Path, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, ([IO.FileShare]::Delete, ([IO.FileShare]::ReadWrite))))
-                $null = $Reader.BaseStream.Seek($LastFilePos, [System.IO.SeekOrigin]::Begin)
-                        
-                while (($Line = $Reader.ReadLine()) -ne $null)
-                {
-                    if (-not (test-path -LiteralPath $Path -ErrorAction SilentlyContinue))
-                    {        
-                        $RotatedReader.Close()
-                        write-verbose -message "File renamed, moved or deleted, may have been rotated."
-                        continue
-                    }
-                    else
-                    {
-                        Write-Verbose -Message $Line
-                        foreach ($RegExPattern in $RegExPatterns.Keys)
-                        {
-                            if ($Line -match $RegExPattern)
-                            {
-                                $RegExPatterns[$RegExPattern]
-                                $Reader.Close()
-                                break Loop
-                            }
-                        }
-                    }
-                }
-                $LastFilePos = $Reader.BaseStream.Position
-                $Reader.Close()
-                $LastFileCreateTime = (Get-Item $Path).CreationTime
+                $FileJustRotated = $true
+                write-verbose -message "File creation time changed. Will scan entire file."
             }
         }
+
+        # Has the file changed since the last pass?
+        $Reader = New-Object -TypeName System.IO.StreamReader -ArgumentList (New-Object -TypeName IO.FileStream -ArgumentList ($Path, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, ([IO.FileShare]::Delete, ([IO.FileShare]::ReadWrite))))
+        $FileLength = $Reader.BaseStream.Length
+        $Reader.Close()
+        if (($FileLength -eq $LastFilePos) -and $FileJustRotated -eq $false)
+        {
+            continue
+        }
+
+        if ($FileLength -lt $LastFilePos)
+        {
+            $FileJustRotated = $true
+            write-verbose -message "File content reduced in size, file may have been rotated. Will scan entire file."
+        }              
+                
+        $RotatedFileMatch = $Path -replace '\.', '-*.' 
+        $RotatedPath = Get-ChildItem -Path $RotatedFileMatch -ErrorAction SilentlyContinue | Where-Object { $_.LastWriteTime -gt $RotateTime }
+                
+        if ($RotatedPath) 
+        {
+            Write-Verbose -Message "Rotated file detected: $RotatedPath, scanning it from position $LastFilePos"
+                    
+            $RotatedReader = New-Object -TypeName System.IO.StreamReader -ArgumentList (New-Object -TypeName IO.FileStream -ArgumentList ($RotatedPath.FullName, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, ([IO.FileShare]::Delete, ([IO.FileShare]::ReadWrite))))
+            $null = $RotatedReader.BaseStream.Seek($LastFilePos, [System.IO.SeekOrigin]::Begin)
+                
+            while (($Line = $RotatedReader.ReadLine()) -ne $null)
+            {
+                if (-not (test-path -LiteralPath $Path -ErrorAction SilentlyContinue))
+                {
+                    $RotatedReader.Close()
+                    write-verbose -message "File renamed, moved or deleted, may have been rotated."
+                    continue
+                }
+
+                Write-Verbose -Message $Line
+                foreach ($RegExPattern in $RegExPatterns.Keys)
+                {
+                    if ($Line -match $RegExPattern)
+                    {
+                        $RegExPatterns[$RegExPattern]
+                        $RotatedReader.Close()
+                        break Loop
+                    }
+                }
+                
+            }
+            $RotatedReader.Close()
+            $RotateTime = $RotatedPath.LastWriteTime
+        
+            write-verbose -message "Setting scan position to 0 as file was rotated."
+            $LastFilePos = 0
+        }
+        
+        if ($FileJustRotated)
+        {
+            write-verbose -message "Setting scan position to 0 as file rotated."
+            $LastFilePos = 0
+            $FileJustRotated = $false
+        }
+                    
+        $Reader = New-Object -TypeName System.IO.StreamReader -ArgumentList (New-Object -TypeName IO.FileStream -ArgumentList ($Path, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, ([IO.FileShare]::Delete, ([IO.FileShare]::ReadWrite))))
+        $null = $Reader.BaseStream.Seek($LastFilePos, [System.IO.SeekOrigin]::Begin)
+                        
+        while (($Line = $Reader.ReadLine()) -ne $null)
+        {
+            if (-not (test-path -LiteralPath $Path -ErrorAction SilentlyContinue))
+            {        
+                $RotatedReader.Close()
+                write-verbose -message "File renamed, moved or deleted, may have been rotated."
+                continue
+            }
+
+            Write-Verbose -Message $Line
+            foreach ($RegExPattern in $RegExPatterns.Keys)
+            {
+                if ($Line -match $RegExPattern)
+                {
+                    $RegExPatterns[$RegExPattern]
+                    $Reader.Close()
+                    break Loop
+                }
+            }
+        }
+        $LastFilePos = $Reader.BaseStream.Position
+        $Reader.Close()
+        $LastFileCreateTime = (Get-Item $Path).CreationTime
     }
 }
+
+
